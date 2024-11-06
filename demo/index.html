@@ -65,7 +65,8 @@
               <form class="mt-1" onsubmit="tokenizeSecureInput(event)">
                 <div class="form-group">
                   <label for="handsoff.pan">Card Number</label>
-                  <div id="payment-form" class="form-control"></div>
+                  <div id="number-form" class="form-control"></div>
+                  <div id="cvv-form" class="form-control"></div>
                   <div id="payment-form-error" class="alert alert-danger" style="display: none;"></div>
                 </div>
                 <div class="form-group">
@@ -180,9 +181,176 @@
     <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js" integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN" crossorigin="anonymous"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js" integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q" crossorigin="anonymous"></script>
     <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous"></script>
-    <script src="../dist/blockchyp-tokenizer-all.min.js"></script>
+    <script type="text/javascript">
+    // a lot of this copied from https://github.com/blockchyp/blockchyp-tokenizer/blob/master/src/tokenizer.js
+class BlockChypTokenizer {
+  constructor(tokenizingKey, isTestMode = false, devPortalModeEnabled = false) {
+    this.defaultTimeout = 60;
+    this.inputDiv = null;
+    this.cvvDiv = null;
+    this.valid = false;
+    this.tokenizingKey = tokenizingKey;
+
+    this.commonId = BlockChypTokenizer.generateRandomAlphaString(10);
+    this.cardNumberIframeId = `number-${this.commonId}`;
+    this.cvvIframeId = `cvv-${this.commonId}`;
+
+    // this flag is whether or not a merchant is test (sandbox) or live
+    this.isTestMode = isTestMode;
+
+    // set the portal urls based on devPortalModeEnabled
+    if (devPortalModeEnabled) {
+      this.gatewayHost = 'https://api.dev.blockchyp.com';
+      this.testGatewayHost = 'https://test.dev.blockchyp.com';
+    } else {
+      this.gatewayHost = 'https://api.blockchyp.com';
+      this.testGatewayHost = 'https://test.blockchyp.com';
+    }
+
+    this.iframeHost = isTestMode ? this.testGatewayHost : this.gatewayHost;
+  }
+
+  static generateRandomAlphaString(length = 10) {
+    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
+    let result = '';
+    for (let i = 0; i < length; i++) {
+      result += characters.charAt(
+        Math.floor(Math.random() * characters.length),
+      );
+    }
+    return result;
+  }
+
+  isValid() {
+    return this.valid;
+  }
+
+  buildBasicIframe(parentEl, iframeIdToUse, options) {
+    parentEl.setAttribute('style', 'margin: 0; padding: 0;');
+
+    const newFrame = document.createElement('iframe');
+    newFrame.setAttribute('style', 'margin: 0; padding: 0;');
+    newFrame.setAttribute('id', iframeIdToUse);
+    newFrame.setAttribute('frameBorder', '0');
+    newFrame.setAttribute('scrolling', 'no');
+    newFrame.setAttribute('width', '100%');
+    if (options && options.height) {
+      newFrame.setAttribute('height', options.height);
+    } else {
+      newFrame.setAttribute('height', '36px');
+    }
+
+    const buildSrc = () => {
+      let src = `${this.iframeHost}/secure-input?key=${this.tokenizingKey}`;
+      let optionsStr = '';
+
+      if (options) {
+        // encode options with btoa since this is client side
+        const optionsEncoded = btoa(JSON.stringify(options));
+        optionsStr = '&options=' + optionsEncoded;
+      }
+
+      return `${src}${optionsStr}&origin=${encodeURI(window.location.href)}`;
+    };
+
+    newFrame.setAttribute('src', buildSrc());
+    parentEl.appendChild(newFrame);
+
+    return newFrame;
+  }
+
+  render(numberDivId, cvvDivId, options) {
+    const self = this;
+
+    // deal with the card number div
+    this.inputDiv = numberDivId;
+    this.cvvDiv = cvvDivId;
+    const inputDiv = document.getElementById(numberDivId);
+    const cvvDiv = document.getElementById(cvvDivId);
+
+    const cardFrame = this.buildBasicIframe(inputDiv, this.cardNumberIframeId, {
+      ...options,
+      cardLogo: false,
+      cvv: false,
+      expirationDate: false,
+      cardNumberIframeId: this.cardNumberIframeId,
+      cvvIframeId:this.cardNumberIframeId,
+    });
+
+    const cvvFrame = this.buildBasicIframe(cvvDiv, this.cvvIframeId, {
+      ...options,
+      cardLogo: false,
+      cardNumber: false,
+      expirationDate: false,
+      cardNumberIframeId: this.cardNumberIframeId,
+      cvvIframeId:this.cardNumberIframeId,
+
+    });
+
+    if (document.getElementById(numberDivId + '-error')) {
+      var errorDiv = document.getElementById(numberDivId + '-error');
+      errorDiv.style.display = 'none';
+    }
+
+    window.addEventListener('message', function (event) {
+      if (event.data['message']) {
+        switch (event.data['message']) {
+          case 'validate':
+            let inputDiv = document.getElementById(numberDivId);
+            let errorDiv = document.getElementById(self.inputDiv + '-error');
+            if (event.data['valid']) {
+              self.valid = true;
+              inputDiv.style['border-color'] = null;
+              errorDiv.style.display = 'none';
+            } else {
+              self.valid = false;
+              inputDiv.style['border-color'] = 'red';
+              errorDiv.style.display = 'block';
+              errorDiv.innerText = event.data.error;
+            }
+        }
+      }
+    });
+  }
+
+  tokenize(request) {
+    let url = '';
+    const self = this;
+    if (request.test) {
+      url = self.testGatewayHost;
+    } else {
+      url = self.gatewayHost;
+    }
+    const errorDiv = document.getElementById(self.inputDiv + '-error');
+    errorDiv.style.display = 'none';
+    const promise = new Promise(function (resolve, reject) {
+      window.addEventListener('message', function (event) {
+        if (!event.data['message']) {
+          console.log('Response: ' + JSON.stringify(event));
+          if (!event.data.success) {
+            if (document.getElementById(self.inputDiv + '-error')) {
+              const errorDiv = document.getElementById(
+                self.inputDiv + '-error',
+              );
+              errorDiv.style.display = 'block';
+              errorDiv.innerText = event.data.responseDescription;
+            }
+          }
+          resolve(event);
+        }
+      });
+      request['origin'] = window.location.href;
+      document
+        .getElementById(this.cardNumberIframeId)
+        .contentWindow.postMessage(request, url);
+    });
+    return promise;
+  }
+}
+</script>
     <script type="text/javascript">
 
+      
       function saveConfig (e) {
 
         e.preventDefault();
@@ -194,8 +362,12 @@
 
       function renderForm (e) {
 
-        tokenizer.setGatewayHost($("#gatewayHost").val());
-        tokenizer.setTestGatewayHost($("#testGatewayHost").val());
+
+      const tokenizer = new BlockChypTokenizer(
+        $("#tokenizingKey").val(),
+        true,
+        true,
+      )
 
         var options = {
           cardLogo: $("#rendered-logo").is(':checked'),
@@ -205,7 +377,7 @@
           cvv: $("#rendered-cvv").is(':checked')
         }
 
-        tokenizer.render($("#tokenizingKey").val(), $("#rendered-test").is(':checked'), 'payment-form', options);
+        tokenizer.render('number-form', 'cvv-form', options);
 
       }
 
