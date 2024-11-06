@@ -67,19 +67,19 @@
                   <label for="handsoff.pan">Card Number</label>
                   <div id="number-form" class="form-control"></div>
                   <div id="cvv-form" class="form-control"></div>
-                  <div id="payment-form-error" class="alert alert-danger" style="display: none;"></div>
+                  <div id="number-form-error" class="alert alert-danger" style="display: none;"></div>
                 </div>
                 <div class="form-group">
                   <label for="rendered-cardholder">Cardholder Name</label>
-                  <input class="form-control" id="rendered-cardholder"/>
+                  <input class="form-control" id="rendered-cardholder" value="Pit Viper"/>
                 </div>
                 <div v-if="!$('#rendered-expiration').is(':checked')" class="form-group">
                   <label for="expMonth">Expiration Month</label>
-                  <input class="form-control" id="expMonth"/>
+                  <input class="form-control" id="expMonth" value="03"/>
                 </div>
                 <div v-if="!$('#rendered-expiration').is(':checked')" class="form-group">
                   <label for="expYear">Expiration Year</label>
-                  <input class="form-control" id="expYear"/>
+                  <input class="form-control" id="expYear"  value="2025"/>
                 </div>
                 <div class="row">
                   <div class="col-md-3">
@@ -201,7 +201,8 @@ class BlockChypTokenizer {
     // set the portal urls based on devPortalModeEnabled
     if (devPortalModeEnabled) {
       this.gatewayHost = 'https://api.dev.blockchyp.com';
-      this.testGatewayHost = 'https://test.dev.blockchyp.com';
+      // this.testGatewayHost = 'https://test.dev.blockchyp.com';
+      this.testGatewayHost = './iframes'; // no trailing slash
     } else {
       this.gatewayHost = 'https://api.blockchyp.com';
       this.testGatewayHost = 'https://test.blockchyp.com';
@@ -211,26 +212,28 @@ class BlockChypTokenizer {
   }
 
   static generateRandomAlphaString(length = 10) {
-    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
-    let result = '';
-    for (let i = 0; i < length; i++) {
-      result += characters.charAt(
-        Math.floor(Math.random() * characters.length),
-      );
-    }
-    return result;
+    // const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
+    // let result = '';
+    // for (let i = 0; i < length; i++) {
+    //   result += characters.charAt(
+    //     Math.floor(Math.random() * characters.length),
+    //   );
+    // }
+    // return result;
+    return '123456789';
   }
 
   isValid() {
     return this.valid;
   }
 
-  buildBasicIframe(parentEl, iframeIdToUse, options) {
+  buildBasicIframe(mode, parentEl, iframeIdToUse, options) {
     parentEl.setAttribute('style', 'margin: 0; padding: 0;');
 
     const newFrame = document.createElement('iframe');
     newFrame.setAttribute('style', 'margin: 0; padding: 0;');
     newFrame.setAttribute('id', iframeIdToUse);
+    newFrame.setAttribute('name', iframeIdToUse);
     newFrame.setAttribute('frameBorder', '0');
     newFrame.setAttribute('scrolling', 'no');
     newFrame.setAttribute('width', '100%');
@@ -241,7 +244,16 @@ class BlockChypTokenizer {
     }
 
     const buildSrc = () => {
-      let src = `${this.iframeHost}/secure-input?key=${this.tokenizingKey}`;
+
+      const localIframeServerMode = true;
+      let iframeFileName = 'secure-input';
+
+      if (localIframeServerMode) {
+        iframeFileName = `${mode}-iframe.html`
+      }
+
+      // let src = `${this.iframeHost}/secure-input?key=${this.tokenizingKey}`;
+      let src = `${this.iframeHost}/${iframeFileName}?key=${this.tokenizingKey}`;
       let optionsStr = '';
 
       if (options) {
@@ -268,7 +280,7 @@ class BlockChypTokenizer {
     const inputDiv = document.getElementById(numberDivId);
     const cvvDiv = document.getElementById(cvvDivId);
 
-    const cardFrame = this.buildBasicIframe(inputDiv, this.cardNumberIframeId, {
+    const cardFrame = this.buildBasicIframe('number', inputDiv, this.cardNumberIframeId, {
       ...options,
       cardLogo: false,
       cvv: false,
@@ -277,7 +289,7 @@ class BlockChypTokenizer {
       cvvIframeId:this.cardNumberIframeId,
     });
 
-    const cvvFrame = this.buildBasicIframe(cvvDiv, this.cvvIframeId, {
+    const cvvFrame = this.buildBasicIframe('cvv', cvvDiv, this.cvvIframeId, {
       ...options,
       cardLogo: false,
       cardNumber: false,
@@ -314,35 +326,41 @@ class BlockChypTokenizer {
   }
 
   tokenize(request) {
-    let url = '';
+
     const self = this;
-    if (request.test) {
-      url = self.testGatewayHost;
-    } else {
-      url = self.gatewayHost;
-    }
+    // let url = this.iframeHost;
+    let url = 'http://127.0.0.1:9000/';
+
     const errorDiv = document.getElementById(self.inputDiv + '-error');
     errorDiv.style.display = 'none';
+
     const promise = new Promise(function (resolve, reject) {
-      window.addEventListener('message', function (event) {
-        if (!event.data['message']) {
-          console.log('Response: ' + JSON.stringify(event));
-          if (!event.data.success) {
-            if (document.getElementById(self.inputDiv + '-error')) {
-              const errorDiv = document.getElementById(
-                self.inputDiv + '-error',
-              );
-              errorDiv.style.display = 'block';
-              errorDiv.innerText = event.data.responseDescription;
+
+      try {
+
+        window.addEventListener('message', function (event) {
+          if (!event.data['message']) {
+            console.log('Response: ' + JSON.stringify(event));
+            if (!event.data.success) {
+              if (document.getElementById(self.inputDiv + '-error')) {
+                const errorDiv = document.getElementById(
+                  self.inputDiv + '-error',
+                );
+                errorDiv.style.display = 'block';
+                errorDiv.innerText = event.data.responseDescription;
+              }
             }
+            resolve(event);
           }
-          resolve(event);
-        }
-      });
-      request['origin'] = window.location.href;
-      document
-        .getElementById(this.cardNumberIframeId)
-        .contentWindow.postMessage(request, url);
+        });
+        request['origin'] = window.location.href;
+        document
+          .getElementById(self.cardNumberIframeId)
+          .contentWindow.postMessage(request, url);
+      } catch(e) {
+        console.error('in catch block');
+        console.error(e);
+      }
     });
     return promise;
   }
@@ -350,6 +368,7 @@ class BlockChypTokenizer {
 </script>
     <script type="text/javascript">
 
+      let tokenizer;
       
       function saveConfig (e) {
 
@@ -363,11 +382,11 @@ class BlockChypTokenizer {
       function renderForm (e) {
 
 
-      const tokenizer = new BlockChypTokenizer(
-        $("#tokenizingKey").val(),
-        true,
-        true,
-      )
+        tokenizer = new BlockChypTokenizer(
+          $("#tokenizingKey").val(),
+          true,
+          true,
+        )
 
         var options = {
           cardLogo: $("#rendered-logo").is(':checked'),
@@ -385,9 +404,6 @@ class BlockChypTokenizer {
 
         e.preventDefault();
 
-        tokenizer.setGatewayHost($("#gatewayHost").val());
-        tokenizer.setTestGatewayHost($("#testGatewayHost").val());
-
         let req = {
           test: $("#rendered-test").is(':checked'),
           cardholderName: $("#rendered-cardholder").val(),
@@ -395,13 +411,15 @@ class BlockChypTokenizer {
           expYear: $("#expYear").val(),
         }
 
-        tokenizer.tokenize($("#tokenizingKey").val(), req)
+        tokenizer.tokenize(req)
           .then(function (response) {
             console.log(JSON.stringify(response.data))
-            alert('Full Input Response: ' + JSON.stringify(response.data));
+            // alert('Full Input Response: ' + JSON.stringify(response.data));
+            console.info('Full Input Response: ' + JSON.stringify(response.data));
           })
           .catch(function (error) {
-            alert("Error:", error);
+            // alert("Error:", error);
+            console.error(error);
           })
 
       }
@@ -409,9 +427,6 @@ class BlockChypTokenizer {
       function tokenizeHandsOffForm (e) {
 
         e.preventDefault();
-
-        tokenizer.setGatewayHost($("#gatewayHost").val());
-        tokenizer.setTestGatewayHost($("#testGatewayHost").val());
 
         let req = {
           test: true,
@@ -423,7 +438,7 @@ class BlockChypTokenizer {
           cardholderName: $("#handsoff-cardholder").val()
         }
 
-        tokenizer.tokenize($("#tokenizingKey").val(), req)
+        tokenizer.tokenize( req)
           .then(function (response) {
             alert('Hands Off Response: ' + JSON.stringify(response.data));
           })
