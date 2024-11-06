@@ -72,11 +72,43 @@
                   <label for="rendered-cardholder">Cardholder Name</label>
                   <input class="form-control" id="rendered-cardholder"/>
                 </div>
+                <div v-if="!$('#rendered-expiration').is(':checked')" class="form-group">
+                  <label for="expMonth">Expiration Month</label>
+                  <input class="form-control" id="expMonth"/>
+                </div>
+                <div v-if="!$('#rendered-expiration').is(':checked')" class="form-group">
+                  <label for="expYear">Expiration Year</label>
+                  <input class="form-control" id="expYear"/>
+                </div>
                 <div class="row">
                   <div class="col-md-3">
                     <div class="form-group">
                       <label for="rendered-cardholder">Test:</label>
                       <input type="checkbox" id="rendered-test" checked/>
+                    </div>
+                  </div>
+                  <div class="col-md-3">
+                    <div class="form-group">
+                      <label for="rendered-cardholder">Card Logo:</label>
+                      <input type="checkbox" id="rendered-logo" checked/>
+                    </div>
+                  </div>
+                  <div class="col-md-3">
+                    <div class="form-group">
+                      <label for="rendered-cardholder">Card Number:</label>
+                      <input type="checkbox" id="rendered-pan" checked/>
+                    </div>
+                  </div>
+                  <div class="col-md-3">
+                    <div class="form-group">
+                      <label for="rendered-cardholder">Expiration Date:</label>
+                      <input type="checkbox" id="rendered-expiration" checked/>
+                    </div>
+                  </div>
+                  <div class="col-md-3">
+                    <div class="form-group">
+                      <label for="rendered-cardholder">CVV:</label>
+                      <input type="checkbox" id="rendered-cvv" checked/>
                     </div>
                   </div>
                   <div class="col-md-3">
@@ -166,7 +198,11 @@
         tokenizer.setTestGatewayHost($("#testGatewayHost").val());
 
         var options = {
-          postalCode: $("#rendered-postalcode").is(':checked')
+          cardLogo: $("#rendered-logo").is(':checked'),
+          cardNumber: $("#rendered-pan").is(':checked'),
+          postalCode: $("#rendered-postalcode").is(':checked'),
+          expirationDate: $("#rendered-expiration").is(':checked'),
+          cvv: $("#rendered-cvv").is(':checked')
         }
 
         tokenizer.render($("#tokenizingKey").val(), $("#rendered-test").is(':checked'), 'payment-form', options);
@@ -182,7 +218,9 @@
 
         let req = {
           test: $("#rendered-test").is(':checked'),
-          cardholderName: $("#rendered-cardholder").val()
+          cardholderName: $("#rendered-cardholder").val(),
+          expMonth: $("#expMonth").val(),
+          expYear: $("#expYear").val(),
         }
 
         tokenizer.tokenize($("#tokenizingKey").val(), req)
