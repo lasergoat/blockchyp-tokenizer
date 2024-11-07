@@ -92,7 +92,7 @@
       var cvvIframeId = 'cvv-1234567890'; // '{{.Options.cvvIframeId}}'
 
       window.name = cvvIframeId;
-      
+
       function isNumericKey(e) {
         if (e.key === '0') {
           return true;
@@ -110,9 +110,11 @@
         }
       }
 
-      window.getCvv = () => {
-        return $('#cvv').val();
-      }
+      {{ if .Options.CVV }}
+        window.getCvv = () => {
+          return $('#cvv').val();
+        }
+      {{ end }}
 
       function handleCvvInput(e) {
         // var cvv = document.getElementById('cvv').value;
